@@ -8,7 +8,7 @@ venv/
 # data & models — too large / personal
 data/raw/
 data/processed/
-models/
+models/*.pkl
 
 # IDE
 .vscode/

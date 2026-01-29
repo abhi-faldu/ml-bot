@@ -219,3 +219,19 @@ if __name__ == "__main__":
     state = AccountRiskState(peak_equity=10000, daily_start_equity=10000)
     print(f"\nCircuit breaker check at equity=9800: halted={state.check_circuit_breakers(9800)}")
     print(f"Circuit breaker check at equity=9400: halted={state.check_circuit_breakers(9400)}")
+
+# added Jan 29: convenience function for live_trade integration
+def get_risk_config_from_app_config() -> RiskConfig:
+    """Build RiskConfig from values in config.py."""
+    try:
+        import importlib
+        cfg_mod = importlib.import_module("config")
+        return RiskConfig(
+            atr_period=getattr(cfg_mod, "ATR_PERIOD", 14),
+            atr_multiplier=getattr(cfg_mod, "ATR_MULTIPLIER", 2.0),
+            tp_multiplier=getattr(cfg_mod, "TP_MULTIPLIER", 3.0),
+            max_daily_loss_pct=getattr(cfg_mod, "MAX_DAILY_LOSS", 0.02),
+            max_drawdown_pct=getattr(cfg_mod, "MAX_DRAWDOWN", 0.05),
+        )
+    except Exception:
+        return RiskConfig()

@@ -26,3 +26,4 @@ ATR_MULTIPLIER   = 2.0   # stop = entry - ATR_MULTIPLIER * ATR
 TP_MULTIPLIER    = 3.0   # take profit = entry + TP_MULTIPLIER * ATR
 MAX_DAILY_LOSS   = 0.02  # halt if down 2% on the day
 MAX_DRAWDOWN     = 0.05  # halt if down 5% from equity peak
+

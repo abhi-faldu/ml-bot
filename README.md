@@ -213,3 +213,27 @@ python src/data/download_crypto.py   # correct
 Personal learning project exploring ML-based crypto trading strategies.
 
 > ⚠️ Not financial advice. Use at your own risk.
+
+## Upgrades (Feb 2026)
+
+Three critical issues from the engineering review have been addressed:
+
+### Fix 1 — Data Leakage Prevention
+`src/data/pipeline.py` enforces strict temporal ordering and prevents
+any future data from leaking into the training window.
+
+### Fix 2 — Walk-Forward Validation
+`src/models/walk_forward.py` replaces single train/test split with
+rolling walk-forward validation across configurable folds.
+
+Run it with:
+```bash
+python src/models/walk_forward.py
+```
+
+### Fix 3 — Dynamic Risk Management
+`src/risk/risk_manager.py` implements:
+- ATR-based stop loss (stop = entry - 2 * ATR)
+- ATR-based take profit (TP = entry + 3 * ATR)
+- Daily loss limit: halts bot if down >2% on the day
+- Max drawdown circuit breaker: halts if down >5% from peak

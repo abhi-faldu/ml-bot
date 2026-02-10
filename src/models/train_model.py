@@ -33,4 +33,4 @@ def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> RandomForestClassifier:
 
 if __name__ == "__main__":
     train()
-# updated to use pipeline
+

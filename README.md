@@ -237,3 +237,20 @@ python src/models/walk_forward.py
 - ATR-based take profit (TP = entry + 3 * ATR)
 - Daily loss limit: halts bot if down >2% on the day
 - Max drawdown circuit breaker: halts if down >5% from peak
+
+## Feature Engineering Upgrade (Feb 2026)
+
+Replaced lagged-returns-only features with a richer set:
+
+| Feature | Description |
+|---|---|
+| `ret_lag_1..10` | Lagged 1h returns (momentum) |
+| `rsi_14` | Relative Strength Index — overbought/oversold |
+| `macd` | MACD line — trend direction |
+| `macd_signal` | MACD signal line — trigger |
+| `macd_hist` | MACD histogram — momentum change |
+| `atr_14` | Average True Range — volatility |
+| `vol_ratio` | Volume vs 20-period average |
+
+All indicators implemented in pure pandas — no extra dependencies.
+Run `python src/data/make_features.py` to regenerate processed features.

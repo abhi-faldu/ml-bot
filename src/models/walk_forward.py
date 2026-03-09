@@ -61,7 +61,8 @@ def walk_forward_validate(
     df_raw  = load_raw(csv_name)
     df      = build_features(df_raw, lookback)
 
-    feature_cols = [c for c in df.columns if c.startswith("ret_lag_")]
+    from src.data.make_features import get_feature_cols
+    feature_cols = get_feature_cols(df)
     X = df[feature_cols].values
     y = df["target"].values
     dates = df.index

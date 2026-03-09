@@ -1,24 +1,12 @@
-# ML Bot — Crypto Trading Bot
+# ml-bot
 
-Automated BTC/USDT direction prediction and live trading using a Random Forest classifier on hourly candles.
+A Python machine learning trading bot for BTC/USDT using the Binance API.
 
-## Overview
+Built as a research and engineering project across January–March 2026.
 
-This bot predicts whether the next hourly BTC/USDT candle will close **up or down** using lagged return features:
+> **Finding:** Price and volume features (RSI, MACD, ATR, lagged returns) do not predict BTC/USDT hourly direction above the break-even threshold after fees. OOS accuracy = 50.00% across 17,500 rows and 5 walk-forward folds. See [FINDINGS.md](FINDINGS.md) for full analysis.
 
-- **Signal 1**: Long — buy market order
-- **Signal 0**: Flat — no trade
-
-The pipeline covers data download, feature engineering, model training, backtesting, and live execution on Binance.
-
-## Features
-
-- **Automated OHLCV download** via ccxt with pagination
-- **Lagged return features** (10 lags by default) for direction prediction
-- **Random Forest classifier** with tuned hyperparameters (300 trees, max_depth=8)
-- **Vectorized backtest** with fee deduction and equity curve
-- **Annualised Sharpe ratio** reporting
-- **Live trading loop** with Binance market orders and structured logging
+---
 
 ## Project Structure
 
@@ -26,231 +14,92 @@ The pipeline covers data download, feature engineering, model training, backtest
 ml-bot/
 ├── src/
 │   ├── data/
-│   │   ├── __init__.py
-│   │   ├── download_crypto.py    # pull OHLCV candles via ccxt
-│   │   └── make_features.py      # build lagged-return feature matrix
+│   │   ├── download_crypto.py   # fetches 2 years of OHLCV via ccxt
+│   │   ├── make_features.py     # RSI, MACD, ATR, volume ratio, lagged returns
+│   │   └── pipeline.py          # temporal-safe train/test split
 │   ├── models/
-│   │   ├── __init__.py
-│   │   └── train_model.py        # train and save RF model
+│   │   ├── train_model.py       # LightGBM classifier
+│   │   └── walk_forward.py      # 5-fold walk-forward validation
+│   ├── risk/
+│   │   └── risk_manager.py      # ATR stops, daily loss limit, drawdown breaker
 │   ├── backtest/
-│   │   ├── __init__.py
-│   │   └── backtest.py           # vectorized backtest with equity curve
+│   │   └── backtest.py          # vectorised backtest + Sharpe ratio
 │   ├── live/
-│   │   ├── __init__.py
-│   │   └── live_trade.py         # live hourly trading loop
-│   ├── __init__.py
-│   └── utils.py                  # shared helpers
-├── data/
-│   ├── raw/                      # CSV output from download_crypto.py
-│   └── processed/                # feature CSVs from make_features.py
-├── models/                       # saved .pkl model files
-├── tests/                        # unit tests
-├── docs/                         # documentation
-├── config.py                     # all tuneable settings in one place
+│   │   └── live_trade.py        # hourly trading loop
+│   └── utils.py
+├── config.py
 ├── requirements.txt
+├── FINDINGS.md                  # full research findings and null result analysis
 └── README.md
 ```
 
+---
+
 ## Quickstart
 
-### Prerequisites
-
-- Python 3.8 or higher
-- Binance account (for live trading only)
-
-### 1. Clone Repository
-
 ```bash
-git clone https://github.com/abhi-faldu/ml-bot
-cd ml-bot
-```
-
-### 2. Create Virtual Environment
-
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Linux/macOS
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
+# 1. install
 pip install -r requirements.txt
-```
 
-## Usage
+# 2. set env vars
+export BINANCE_API_KEY=your_key
+export BINANCE_API_SECRET=your_secret
+export PYTHONPATH=/path/to/ml-bot
 
-### Step 1 — Download Data
-
-```bash
+# 3. download 2 years of data (~17,500 rows)
 python src/data/download_crypto.py
-```
 
-Downloads hourly BTC/USDT and ETH/USDT candles and saves to `data/raw/`.
-
-### Step 2 — Build Features
-
-```bash
+# 4. build features
 python src/data/make_features.py
-```
 
-Generates 10 lagged return features and direction target, saved to `data/processed/`.
+# 5. validate model (walk-forward)
+python src/models/walk_forward.py
 
-### Step 3 — Train Model
-
-```bash
+# 6. train final model
 python src/models/train_model.py
-```
 
-Trains a Random Forest (300 trees, max_depth=8) and saves to `models/`.
-
-### Step 4 — Backtest
-
-```bash
-python src/backtest/backtest.py
-```
-
-Runs a vectorized backtest and prints total return, trade count, and annualised Sharpe ratio.
-
-### Step 5 — Live Trading
-
-```bash
-# Set your Binance API keys first
-export BINANCE_API_KEY=your_key       # Windows: $env:BINANCE_API_KEY="your_key"
-export BINANCE_API_SECRET=your_secret # Windows: $env:BINANCE_API_SECRET="your_secret"
-
+# 7. run live loop (testnet)
 python src/live/live_trade.py
 ```
 
-Runs every hour — fetches latest candles, predicts direction, places market order if signal is long.
+---
 
-## Technical Details
-
-### Feature Pipeline
-
-1. Download raw OHLCV candles (ccxt)
-2. Compute 1-period percentage returns
-3. Generate 10 lagged return features (`ret_lag_1` … `ret_lag_10`)
-4. Binary target: 1 if next candle closes up, else 0
-
-### Model
-
-- Algorithm: Random Forest Classifier
-- Estimators: 300 trees
-- Max depth: 8
-- Train/test split: 80/20 (no shuffling — preserves time order)
-- All cores used: `n_jobs=-1`
-
-### Backtest
-
-- Signal: model prediction (1 = long, 0 = flat)
-- Fee: 0.04% charged on every position change
-- Metrics: total return %, trade count, annualised Sharpe ratio
-
-## Configuration
-
-All settings are in `config.py` at the project root:
-
-```python
-SYMBOL = "BTC/USDT"       # trading pair
-TIMEFRAME = "1h"           # candle interval
-LOOKBACK = 10              # number of lag features
-EXCHANGE_ID = "binance"    # ccxt exchange
-FEE = 0.0004               # taker fee
-INITIAL_CAPITAL = 10_000   # starting equity for backtest
-MODEL_NAME = "rf_crypto_next_candle.pkl"
-```
-
-## Requirements
-
-```
-ccxt>=4.2
-pandas>=2.0
-scikit-learn>=1.4
-joblib>=1.3
-python-binance>=1.0.19
-matplotlib>=3.8
-numpy>=1.26
-```
-
-## Troubleshooting
-
-**Issue: `BINANCE_API_KEY` not found**
-
-```bash
-# Windows PowerShell
-$env:BINANCE_API_KEY="your_key"
-$env:BINANCE_API_SECRET="your_secret"
-```
-
-**Issue: Model file not found**
-
-```
-# Run steps in order — train_model.py must run before backtest or live_trade
-python src/models/train_model.py
-```
-
-**Issue: ModuleNotFoundError**
-
-```bash
-# Always run scripts from the project root, not from inside src/
-cd ml-bot
-python src/data/download_crypto.py   # correct
-```
-
-**Issue: Low prediction accuracy**
-
-- Increase `LOOKBACK` in `config.py` for more lag features
-- Add technical indicators (RSI, MACD) inside `src/data/make_features.py`
-
-## About
-
-Personal learning project exploring ML-based crypto trading strategies.
-
-> ⚠️ Not financial advice. Use at your own risk.
-
-## Upgrades (Feb 2026)
-
-Three critical issues from the engineering review have been addressed:
-
-### Fix 1 — Data Leakage Prevention
-`src/data/pipeline.py` enforces strict temporal ordering and prevents
-any future data from leaking into the training window.
-
-### Fix 2 — Walk-Forward Validation
-`src/models/walk_forward.py` replaces single train/test split with
-rolling walk-forward validation across configurable folds.
-
-Run it with:
-```bash
-python src/models/walk_forward.py
-```
-
-### Fix 3 — Dynamic Risk Management
-`src/risk/risk_manager.py` implements:
-- ATR-based stop loss (stop = entry - 2 * ATR)
-- ATR-based take profit (TP = entry + 3 * ATR)
-- Daily loss limit: halts bot if down >2% on the day
-- Max drawdown circuit breaker: halts if down >5% from peak
-
-## Feature Engineering Upgrade (Feb 2026)
-
-Replaced lagged-returns-only features with a richer set:
+## Features (16 total)
 
 | Feature | Description |
 |---|---|
-| `ret_lag_1..10` | Lagged 1h returns (momentum) |
-| `rsi_14` | Relative Strength Index — overbought/oversold |
-| `macd` | MACD line — trend direction |
-| `macd_signal` | MACD signal line — trigger |
-| `macd_hist` | MACD histogram — momentum change |
-| `atr_14` | Average True Range — volatility |
+| `ret_lag_1..10` | Lagged 1h returns |
+| `rsi_14` | Relative Strength Index |
+| `macd` | MACD line |
+| `macd_signal` | MACD signal line |
+| `macd_hist` | MACD histogram |
+| `atr_14` | Average True Range |
 | `vol_ratio` | Volume vs 20-period average |
 
-All indicators implemented in pure pandas — no extra dependencies.
-Run `python src/data/make_features.py` to regenerate processed features.
+---
+
+## Risk Management
+
+- ATR-based stop loss: `entry - 2 × ATR`
+- ATR-based take profit: `entry + 3 × ATR`
+- Daily loss limit: halts bot if down >2% on the day
+- Max drawdown circuit breaker: halts if down >5% from equity peak
+
+---
+
+## What Was Learned
+
+Building the system was valuable. The honest OOS result (50.00%) is the
+correct output of a well-constructed validation framework. A system that
+correctly identifies the absence of edge is more useful than one that
+overfits and loses money live.
+
+To move beyond 50%, the next step is alternative data: funding rates,
+liquidation levels, and order book imbalance. These are not encoded in
+public OHLCV and have shown predictive value in published research.
+
+---
+
+## Tech Stack
+
+Python · LightGBM · scikit-learn · ccxt · python-binance · pandas · numpy

@@ -10,8 +10,14 @@ RSI-14              : rsi_14                  (overbought/oversold)
 MACD line           : macd                    (trend direction)
 MACD signal line    : macd_signal             (trend confirmation)
 MACD histogram      : macd_hist               (momentum change)
-ATR-14              : atr_14                  (volatility)
+ATR-14              : atr_14                  (volatility absolute)
+ATR %               : atr_pct                 (volatility relative to price)
 Volume ratio        : vol_ratio               (volume vs 20-period avg)
+Bollinger %B        : bb_pct                  (position within bands)
+Bollinger width     : bb_width                (band width / MA — regime)
+EMA-20 deviation    : ema_20_dev              (close / EMA20 - 1)
+EMA-50 deviation    : ema_50_dev              (close / EMA50 - 1)
+Candle body %       : body_pct                ((close-open)/(high-low))
 
 All indicators are implemented in pure pandas/numpy — no extra libraries
 needed. Every indicator uses only past data so there is zero look-ahead.
@@ -107,6 +113,66 @@ def add_volume_ratio(df: pd.DataFrame, period: int = 20) -> pd.DataFrame:
     return df
 
 
+def add_bollinger(
+    df: pd.DataFrame,
+    period: int = 20,
+    n_std: float = 2.0,
+    col: str = "close",
+) -> pd.DataFrame:
+    """
+    Bollinger Bands — two derived features.
+
+    bb_pct   : %B = (close - lower) / (upper - lower).
+               0 = at lower band, 1 = at upper band; can exceed [0, 1].
+               Captures mean-reversion potential.
+    bb_width : (upper - lower) / MA — normalised band width.
+               High values = volatile regime, low values = compression.
+    """
+    ma  = df[col].rolling(period).mean()
+    std = df[col].rolling(period).std()
+    upper = ma + n_std * std
+    lower = ma - n_std * std
+    band_range = (upper - lower).replace(0, np.nan)
+    df["bb_pct"]   = (df[col] - lower) / band_range
+    df["bb_width"] = band_range / ma.replace(0, np.nan)
+    return df
+
+
+def add_ema_features(
+    df: pd.DataFrame,
+    spans: tuple = (20, 50),
+    col: str = "close",
+) -> pd.DataFrame:
+    """
+    Price deviation from exponential moving averages.
+
+    ema_20_dev : close / EMA(20) - 1  (short-term trend position)
+    ema_50_dev : close / EMA(50) - 1  (medium-term trend position)
+    Positive = price above EMA (bullish), negative = below (bearish).
+    """
+    for span in spans:
+        ema = df[col].ewm(span=span, adjust=False).mean()
+        df[f"ema_{span}_dev"] = df[col] / ema.replace(0, np.nan) - 1
+    return df
+
+
+def add_candle_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Candle structure and normalised volatility features.
+
+    body_pct : (close - open) / (high - low).
+               +1 = full bullish candle, -1 = full bearish candle.
+               Near 0 = indecision / doji.
+    atr_pct  : atr_14 / close — ATR as a fraction of price.
+               Normalises volatility across different price levels.
+               Requires add_atr() to have been called first.
+    """
+    hl_range = (df["high"] - df["low"]).replace(0, np.nan)
+    df["body_pct"] = (df["close"] - df["open"]) / hl_range
+    df["atr_pct"]  = df["atr_14"] / df["close"].replace(0, np.nan)
+    return df
+
+
 # ── Full feature pipeline ─────────────────────────────────────────────────────
 
 def make_features(csv_name: str, lookback: int = 10) -> pd.DataFrame:
@@ -123,8 +189,12 @@ def make_features(csv_name: str, lookback: int = 10) -> pd.DataFrame:
     df = add_macd(df)
     df = add_atr(df)
     df = add_volume_ratio(df)
+    df = add_bollinger(df)
+    df = add_ema_features(df)
+    df = add_candle_features(df)   # must follow add_atr
 
-    df["target"] = (df["return"].shift(-1) > 0).astype(int)
+    # 4h forward label — longer horizon reduces single-candle noise
+    df["target"] = (df["close"].shift(-4) > df["close"]).astype(int)
     df.dropna(inplace=True)
 
     feature_cols = get_feature_cols(df)
@@ -139,8 +209,13 @@ def make_features(csv_name: str, lookback: int = 10) -> pd.DataFrame:
 def get_feature_cols(df: pd.DataFrame) -> list[str]:
     """Return all feature column names in consistent order."""
     lag_cols  = sorted([c for c in df.columns if c.startswith("ret_lag_")])
-    tech_cols = [c for c in ["rsi_14", "macd", "macd_signal", "macd_hist", "atr_14", "vol_ratio"]
-                 if c in df.columns]
+    tech_cols = [c for c in [
+        "rsi_14", "macd", "macd_signal", "macd_hist",
+        "atr_14", "atr_pct", "vol_ratio",
+        "bb_pct", "bb_width",
+        "ema_20_dev", "ema_50_dev",
+        "body_pct",
+    ] if c in df.columns]
     return lag_cols + tech_cols
 
 

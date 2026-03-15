@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
-import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 import sys
@@ -87,17 +87,12 @@ def walk_forward_validate(
         X_train, y_train = X[:train_end], y[:train_end]
         X_test,  y_test  = X[test_start:test_end], y[test_start:test_end]
 
-        model = lgb.LGBMClassifier(
-            n_estimators=500,
-            learning_rate=0.05,
-            max_depth=5,
-            num_leaves=31,
-            min_child_samples=50,
-            reg_alpha=0.1,
-            reg_lambda=0.1,
+        model = RandomForestClassifier(
+            n_estimators=300,
+            max_depth=6,
+            min_samples_leaf=50,
             random_state=42,
             n_jobs=-1,
-            verbose=-1,
         )
         model.fit(X_train, y_train)
         preds = model.predict(X_test)

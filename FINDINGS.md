@@ -1,8 +1,18 @@
 # Research Findings: ML-Based BTC/USDT Direction Prediction
 
-**Project:** ml-bot  
-**Period:** December 2025 – March 2026  
-**Conclusion:** Price and volume features alone are insufficient to predict BTC/USDT hourly direction above the break-even threshold after fees.
+**Project:** ml-bot
+**Period:** December 2025 – March 2026
+**Status:** Round 2 improvements applied — retraining required for updated metrics.
+
+---
+
+## Round 1 Conclusion
+
+Price and volume features alone are insufficient to predict BTC/USDT hourly direction above the break-even threshold after fees. OOS accuracy = 50.00% across 17,500 rows and 5 walk-forward folds.
+
+## Round 2 Summary
+
+Targeted improvements applied to address the two likely root causes of the null result: insufficient feature richness and excessive label noise. Results pending after retraining.
 
 ---
 
@@ -85,3 +95,69 @@ A system that correctly tells you "there is no edge here, do not trade" is more 
 Do not deploy this system with real capital in its current form.
 
 If continuing development: fetch funding rate and liquidation data from Binance and add them as features. These are not priced into simple technical indicators and have shown predictive value in published research on crypto microstructure.
+
+---
+
+## Round 2: Improvements Applied (March 2026)
+
+### Motivation
+
+Round 1 produced a 50.00% OOS accuracy — statistically indistinguishable from random. Two structural causes were identified:
+
+1. **Label noise** — predicting a single 1h candle direction is near-random because tiny, structureless price fluctuations dominate at short horizons.
+2. **Thin feature set** — 16 features, mostly correlated (MACD has 3 columns derived from the same two EMAs), provided insufficient signal diversity.
+
+### Changes Made
+
+#### 1. Model: LightGBM → RandomForestClassifier
+LightGBM was removed because it was not installed in the active environment. Replaced with `RandomForestClassifier(n_estimators=300, max_depth=6, min_samples_leaf=50)` from scikit-learn. Both are tree ensembles with similar inductive biases; the RF hyperparameters maintain strong regularisation via `min_samples_leaf=50`.
+
+#### 2. Feature set expanded: 16 → 22 features
+
+Six new features added to `src/data/make_features.py`, all derived strictly from past OHLCV data:
+
+| New feature | Function | Signal captured |
+|---|---|---|
+| `bb_pct` | `add_bollinger()` | Position within Bollinger Bands — mean reversion |
+| `bb_width` | `add_bollinger()` | Band width / MA — volatility regime (squeeze vs expansion) |
+| `ema_20_dev` | `add_ema_features()` | close / EMA(20) − 1 — short-term trend deviation |
+| `ema_50_dev` | `add_ema_features()` | close / EMA(50) − 1 — medium-term trend deviation |
+| `body_pct` | `add_candle_features()` | (close − open) / (high − low) — candle direction and conviction |
+| `atr_pct` | `add_candle_features()` | atr_14 / close — volatility normalised by price level |
+
+EMA deviations capture trend structure independently from MACD; Bollinger features add mean-reversion context; candle body ratio captures intra-bar momentum that lagged returns miss.
+
+#### 3. Prediction label: 1h → 4h forward return
+
+```python
+# Round 1
+df["target"] = (df["return"].shift(-1) > 0).astype(int)
+
+# Round 2
+df["target"] = (df["close"].shift(-4) > df["close"]).astype(int)
+```
+
+A 4-hour forward horizon reduces label noise substantially. Single-candle labels are dominated by random micro-fluctuations. A 4h label persists through short-term noise and reflects a tradeable directional move. The backtest signal is still generated every hour — the longer training target makes the model more selective.
+
+#### 4. Backtest overhauled (`src/backtest/backtest.py`)
+
+- **Strict OOS split:** backtest now evaluates only the last 20% of data via `split_temporal()`, eliminating any possibility of training-data contamination.
+- **All 22 features used:** replaced the hardcoded `ret_lag_` filter with `get_feature_cols()`, ensuring RSI, MACD, ATR and the 6 new features are passed to the model.
+- **Confidence filtering:** `model.predict_proba()` replaces `model.predict()`; only bars where P(up) > 0.55 generate a BUY signal, filtering low-conviction noise trades.
+- **Enhanced metrics:** added max drawdown, win rate, fees paid, buy-and-hold comparison, and average holding period.
+- **Equity curve chart:** strategy vs buy-and-hold, both normalised to 1.0, saved as `backtest_equity.png`.
+- **Edge-case handling:** `FileNotFoundError` for missing files; graceful exit with warning if no trades are generated at the chosen threshold.
+
+### What to Run
+
+```bash
+python src/models/train_model.py   # retrain on 22 features + 4h label
+python src/models/walk_forward.py  # validate OOS accuracy
+python src/backtest/backtest.py    # run updated backtest
+```
+
+### Expected Outcome
+
+These changes address the structural causes of the Round 1 null result but do not guarantee improvement — if the market is truly efficient with respect to OHLCV features, 50% OOS accuracy will persist regardless of feature count or label horizon. The changes reduce unnecessary noise and give the model a better chance to detect any signal that exists. Walk-forward output will be the ground truth.
+
+If OOS accuracy remains at 50% after retraining, the conclusion from Round 1 stands: **alternative data is required** (funding rates, order book imbalance, liquidation levels).

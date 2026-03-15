@@ -15,7 +15,7 @@ from pathlib import Path
 import joblib
 import sys
 
-import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -28,7 +28,7 @@ MODEL_DIR = Path(__file__).resolve().parents[2] / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> lgb.LGBMClassifier:
+def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> RandomForestClassifier:
     train_df, test_df = build_and_split(csv_name)
 
     feature_cols = get_feature_cols(train_df)
@@ -37,17 +37,12 @@ def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> lgb.LGBMClassifier:
     X_train, y_train = train_df[feature_cols], train_df["target"]
     X_test,  y_test  = test_df[feature_cols],  test_df["target"]
 
-    model = lgb.LGBMClassifier(
-        n_estimators=500,
-        learning_rate=0.05,
-        max_depth=5,
-        num_leaves=31,
-        min_child_samples=50,   # prevents fitting on tiny leaf nodes
-        reg_alpha=0.1,          # L1 regularisation
-        reg_lambda=0.1,         # L2 regularisation
+    model = RandomForestClassifier(
+        n_estimators=300,
+        max_depth=6,
+        min_samples_leaf=50,
         random_state=42,
         n_jobs=-1,
-        verbose=-1,
     )
     model.fit(X_train, y_train)
 

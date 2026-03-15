@@ -15,7 +15,11 @@ import pandas as pd
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.data.make_features import add_rsi, add_macd, add_atr, add_volume_ratio, get_feature_cols
+from src.data.make_features import (
+    add_rsi, add_macd, add_atr, add_volume_ratio,
+    add_bollinger, add_ema_features, add_candle_features,
+    get_feature_cols,
+)
 from src.utils import add_lag_features
 
 RAW_DIR  = Path(__file__).resolve().parents[2] / "data" / "raw"
@@ -35,9 +39,14 @@ def build_features(df: pd.DataFrame, lookback: int = 10) -> pd.DataFrame:
     """
     Build full feature matrix from raw OHLCV dataframe.
 
-    Features: lagged returns + RSI-14 + MACD + ATR-14 + volume ratio + target.
+    Features: lagged returns + RSI-14 + MACD + ATR-14 + ATR% + volume ratio
+              + Bollinger %B/width + EMA deviations + candle body% + target.
     All indicators use only past data — zero look-ahead bias.
     Splitting is handled separately by split_temporal().
+
+    Label: 1 if close is higher 4 candles from now (4h horizon).
+    A 4h label is substantially less noisy than a single-candle label
+    because small random fluctuations average out over a longer window.
     """
     df = df.copy()
     df["return"] = df["close"].pct_change()
@@ -46,8 +55,11 @@ def build_features(df: pd.DataFrame, lookback: int = 10) -> pd.DataFrame:
     df = add_macd(df)
     df = add_atr(df)
     df = add_volume_ratio(df)
-    # target: 1 if next candle closes higher, else 0
-    df["target"] = (df["return"].shift(-1) > 0).astype(int)
+    df = add_bollinger(df)
+    df = add_ema_features(df)
+    df = add_candle_features(df)   # must follow add_atr
+    # 4h forward label — longer horizon reduces single-candle noise
+    df["target"] = (df["close"].shift(-4) > df["close"]).astype(int)
     df.dropna(inplace=True)
     return df
 

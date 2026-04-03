@@ -31,6 +31,16 @@ ml-bot/
 │   ├── live/
 │   │   └── live_trade.py        # hourly trading loop
 │   └── utils.py
+├── dashboard/
+│   ├── app.py                   # home page and navigation
+│   ├── pages/
+│   │   ├── 1_Overview.py        # OOS equity curve, Sharpe, drawdown, trades table
+│   │   ├── 2_Model_Analysis.py  # feature importances, walk-forward folds, confusion matrix
+│   │   └── 3_Risk_Management.py # ATR stop-loss chart, risk parameters
+│   └── utils/
+│       ├── load_data.py         # cached loaders for backtest, metrics, walk-forward, OHLCV
+│       ├── load_model.py        # cached model loader with fallback logic
+│       └── charts.py            # reusable Plotly chart builders
 ├── config.py
 ├── requirements.txt
 ├── FINDINGS.md                  # full research findings and null result analysis
@@ -65,6 +75,26 @@ python src/backtest/backtest.py
 # 7. run live loop (testnet)
 python src/live/live_trade.py
 ```
+
+---
+
+## Dashboard
+
+A Streamlit dashboard for inspecting backtest results and model analysis without running scripts manually.
+
+```bash
+streamlit run dashboard/app.py
+```
+
+Run from the project root after the backtest and walk-forward scripts have produced their output files.
+
+**Pages:**
+
+- **Overview** — OOS equity curve, Sharpe ratio, max drawdown, total trades, drawdown chart, raw backtest data table
+- **Model Analysis** — feature importances, walk-forward fold results, confusion matrix (coming next)
+- **Risk Management** — ATR stop-loss chart, risk parameter summary (coming next)
+
+**Tech stack:** Streamlit, Plotly, Pandas, joblib, scikit-learn
 
 ---
 
@@ -134,4 +164,4 @@ and have shown predictive value in published research.
 
 ## Tech Stack
 
-Python · scikit-learn · ccxt · python-binance · pandas · numpy · matplotlib
+Python · scikit-learn · ccxt · python-binance · pandas · numpy · matplotlib · Streamlit · Plotly

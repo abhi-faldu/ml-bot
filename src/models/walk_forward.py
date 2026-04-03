@@ -1,7 +1,7 @@
 """
 src/models/walk_forward.py
 
-Walk-forward validation using LightGBM.
+Walk-forward validation using Random Forest.
 
 Why walk-forward matters
 ------------------------
@@ -12,7 +12,7 @@ and is tested on data it has never seen.
 Method
 ------
 1. Start with initial training window (first 60% of data)
-2. Train LightGBM on that window
+2. Train RandomForest on that window
 3. Evaluate on next N candles
 4. Slide window forward by N candles
 5. Repeat until end of dataset
@@ -72,7 +72,7 @@ def walk_forward_validate(
     all_preds  = []
     all_actual = []
 
-    print(f"\nWalk-Forward Validation — {n_splits} folds — LightGBM")
+    print(f"\nWalk-Forward Validation — {n_splits} folds — RandomForest")
     print(f"Total samples  : {n}")
     print(f"Features       : {len(feature_cols)}")
     print(f"Initial train  : {initial_train} ({train_ratio*100:.0f}%)")

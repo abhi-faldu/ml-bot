@@ -1,15 +1,7 @@
 """
 src/models/train_model.py
 
-Trains a LightGBM classifier on the full feature set.
-
-Why LightGBM over Random Forest
----------------------------------
-- Handles tabular financial data better at medium dataset sizes
-- Built-in L1/L2 regularisation reduces overfitting
-- Faster to train, easier to tune
-- predict_proba() gives well-calibrated confidence scores
-  which the live loop can use to filter low-confidence signals
+Trains a Random Forest classifier on the full feature set.
 """
 from pathlib import Path
 import joblib
@@ -32,7 +24,7 @@ def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> RandomForestClassifier:
     train_df, test_df = build_and_split(csv_name)
 
     feature_cols = get_feature_cols(train_df)
-    print(f"Training LightGBM with {len(feature_cols)} features: {feature_cols}")
+    print(f"Training RandomForest with {len(feature_cols)} features: {feature_cols}")
 
     X_train, y_train = train_df[feature_cols], train_df["target"]
     X_test,  y_test  = test_df[feature_cols],  test_df["target"]
@@ -54,6 +46,12 @@ def train(csv_name: str = "binance_BTCUSDT_1h.csv") -> RandomForestClassifier:
     out = MODEL_DIR / MODEL_NAME
     joblib.dump(model, out)
     print(f"model saved -> {out}")
+
+    # save with the dashboard alias so dashboard/utils/load_model.py can find it
+    dashboard_out = MODEL_DIR / "lgbm_model.pkl"
+    joblib.dump(model, dashboard_out)
+    print(f"model saved -> {dashboard_out}")
+
     return model
 
 

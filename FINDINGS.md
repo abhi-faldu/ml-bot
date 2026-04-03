@@ -161,3 +161,34 @@ python src/backtest/backtest.py    # run updated backtest
 These changes address the structural causes of the Round 1 null result but do not guarantee improvement — if the market is truly efficient with respect to OHLCV features, 50% OOS accuracy will persist regardless of feature count or label horizon. The changes reduce unnecessary noise and give the model a better chance to detect any signal that exists. Walk-forward output will be the ground truth.
 
 If OOS accuracy remains at 50% after retraining, the conclusion from Round 1 stands: **alternative data is required** (funding rates, order book imbalance, liquidation levels).
+
+---
+
+## Dashboard
+
+A multipage Streamlit dashboard was added at `dashboard/` to make the backtest results and model analysis inspectable without running scripts manually.
+
+### Pages
+
+- **Home (`app.py`)** — project summary and navigation between pages.
+- **Overview (`pages/1_Overview.py`)** — OOS equity curve, Sharpe ratio, max drawdown, total trades, drawdown chart, and the raw backtest data table. This is the primary results page.
+- **Model Analysis (`pages/2_Model_Analysis.py`)** — placeholder for feature importances, walk-forward fold table, and confusion matrix.
+- **Risk Management (`pages/3_Risk_Management.py`)** — placeholder for ATR stop-loss visualisation and risk parameter summary.
+
+### Utilities
+
+Shared code lives in `dashboard/utils/`:
+
+- `load_data.py` — cached loaders for backtest results, OOS classification metrics, walk-forward results, and raw OHLCV data.
+- `load_model.py` — cached model loader with fallback logic.
+- `charts.py` — reusable Plotly chart builders covering the equity curve, drawdown, feature importance, confusion matrix, and ATR stop chart.
+
+### How to Run
+
+```bash
+streamlit run dashboard/app.py
+```
+
+Run from the project root. The dashboard reads the output files produced by the backtest and walk-forward scripts, so run those first if the output files do not exist.
+
+**Tech stack:** Streamlit, Plotly, Pandas, joblib, scikit-learn.
